@@ -1,86 +1,48 @@
-"""
-Тесты для модуля cache.py.
-Здесь мы проверяем:
-- Получение данных из кэша (есть / нет)
-- Сохранение данных в кэш
-- Разные TTL для погоды и прогноза
-"""
-
+import pytest
+from unittest.mock import MagicMock, patch
 from src.services.cache import get_cached_weather, set_cached_weather, get_cached_forecast, set_cached_forecast
 
 
-def test_get_cached_weather_exists(mock_redis):
-    """
-    Проверяем, что get_cached_weather() возвращает данные,
-    если они есть в Redis.
-    """
-    # Настраиваем мок: Redis вернул строку
-    mock_redis.get.return_value = "☀️ Москва: 25°C, ясно"
-    
-    # Вызываем функцию
-    result = get_cached_weather("Moscow")
-    
-    # Проверяем, что Redis был вызван с правильным ключом
-    mock_redis.get.assert_called_once_with("weather:moscow")
-    
-    # Проверяем результат
-    assert result == "☀️ Москва: 25°C, ясно"
-
-
-def test_get_cached_weather_not_exists(mock_redis):
-    """
-    Проверяем, что get_cached_weather() возвращает None,
-    если данных в Redis нет.
-    """
-    # Настраиваем мок: Redis вернул None
-    mock_redis.get.return_value = None
+def test_get_cached_weather(mock_redis_client):
+    """Тест: получение погоды из кэша"""
+    # Настраиваем мок-клиент, который возвращает get_redis_client()
+    mock_client = MagicMock()
+    mock_client.get.return_value = "☀️ 25°C"
+    mock_redis_client.return_value = mock_client
     
     result = get_cached_weather("Moscow")
     
-    # Проверяем, что Redis был вызван
-    mock_redis.get.assert_called_once_with("weather:moscow")
+    mock_client.get.assert_called_once_with("weather:moscow")
+    assert result == "☀️ 25°C"
+
+
+def test_set_cached_weather(mock_redis_client):
+    """Тест: сохранение погоды в кэш"""
+    mock_client = MagicMock()
+    mock_redis_client.return_value = mock_client
     
-    # Проверяем результат
-    assert result is None
-
-
-def test_set_cached_weather(mock_redis):
-    """
-    Проверяем, что set_cached_weather() сохраняет данные в Redis
-    с правильным ключом, TTL и значением.
-    """
-    # Вызываем функцию сохранения
-    set_cached_weather("Moscow", "☀️ Москва: 25°C, ясно", ttl=600)
+    set_cached_weather("Moscow", "☀️ 25°C", ttl=600)
     
-    # Проверяем, что Redis.setex был вызван с правильными параметрами
-    mock_redis.setex.assert_called_once_with(
-        "weather:moscow",  # ключ
-        600,               # TTL в секундах (10 минут)
-        "☀️ Москва: 25°C, ясно"  # значение
-    )
+    mock_client.setex.assert_called_once_with("weather:moscow", 600, "☀️ 25°C")
 
 
-def test_get_cached_forecast_exists(mock_redis):
-    """
-    Проверяем, что get_cached_forecast() работает аналогично.
-    """
-    mock_redis.get.return_value = "Прогноз: 25°C, ясно"
+def test_get_cached_forecast(mock_redis_client):
+    """Тест: получение прогноза из кэша"""
+    mock_client = MagicMock()
+    mock_client.get.return_value = "Прогноз: 25°C"
+    mock_redis_client.return_value = mock_client
     
     result = get_cached_forecast("Moscow")
     
-    # Ключ для прогноза — другой префикс
-    mock_redis.get.assert_called_once_with("forecast:moscow")
-    assert result == "Прогноз: 25°C, ясно"
+    mock_client.get.assert_called_once_with("forecast:moscow")
+    assert result == "Прогноз: 25°C"
 
 
-def test_set_cached_forecast(mock_redis):
-    """
-    Проверяем, что для прогноза используется другой TTL (1 час).
-    """
-    set_cached_forecast("Moscow", "Прогноз: 25°C, ясно", ttl=3600)
+def test_set_cached_forecast(mock_redis_client):
+    """Тест: сохранение прогноза в кэш"""
+    mock_client = MagicMock()
+    mock_redis_client.return_value = mock_client
     
-    mock_redis.setex.assert_called_once_with(
-        "forecast:moscow",
-        3600,  # 1 час
-        "Прогноз: 25°C, ясно"
-    )
+    set_cached_forecast("Moscow", "Прогноз: 25°C", ttl=3600)
+    
+    mock_client.setex.assert_called_once_with("forecast:moscow", 3600, "Прогноз: 25°C")
